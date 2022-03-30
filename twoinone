@@ -1,4 +1,11 @@
-sudo /usr/share/twoinone/env_sanitizer \
+if [ "$1" == "-h" ] || [ "$1" == "--help" ] || [ "$1" == "-help" ]
+then echo "switch two-in-one between laptop and tablet modes.
+Usage:
+twoinone : toggle mode
+twoinone [laptop|tablet] select a specific mode
+To use twoinone without root permissions, add yourself to the 'tablet' group using 'sudo usermod -aG tablet $\USER'"
+else sudo /usr/share/twoinone/env_sanitizer \
 ORIG_USER=$USER \
 DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS \
 TARGET_MODE=$1
+fi

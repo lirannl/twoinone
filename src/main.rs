@@ -96,6 +96,7 @@ fn determine_current_mode(devices: &JsonValue) -> Result<bool, Box<dyn Error>> {
 }
 
 fn app() -> Result<(), Box<dyn Error>> {
+    println!("{:?}",env::var("TARGET_MODE"));
     let (devices, laptop_commands, tablet_commands) = match fs::read_to_string("/etc/twoinone.json")
     {
         Ok(config_file) => {
@@ -120,9 +121,11 @@ fn app() -> Result<(), Box<dyn Error>> {
     match devices {
         Some(devices) => {
             let target_mode = match env::var("TARGET_MODE") {
-                Ok(val) if val != "" => val == "laptop",
-                _  => !determine_current_mode(&devices)?,
-            };
+                Ok(val) if val == "laptop" => Ok(true),
+                Ok(val) if val == "tablet" => Ok(false),
+                Ok(val) if val != "" => Err(simple_error!("Invalid mode argument")),
+                _  => Ok(!determine_current_mode(&devices)?),
+            }?;
             if !target_mode {
                 for command in tablet_commands.members() {
                     smart_execute(command)?;
