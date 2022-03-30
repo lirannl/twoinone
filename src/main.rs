@@ -96,7 +96,6 @@ fn determine_current_mode(devices: &JsonValue) -> Result<bool, Box<dyn Error>> {
 }
 
 fn app() -> Result<(), Box<dyn Error>> {
-    println!("{:?}",env::var("TARGET_MODE"));
     let (devices, laptop_commands, tablet_commands) = match fs::read_to_string("/etc/twoinone.json")
     {
         Ok(config_file) => {
