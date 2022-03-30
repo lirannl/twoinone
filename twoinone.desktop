@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Two In One
+Comment=Switch between laptop and tablet modes on a two-in-one device
+GenericName=Tablet
+Exec=/usr/bin/twoinone
+Icon=two-in-one
+Type=Application
+Categories=System
+[Desktop Action laptop-mode]
+Name=Laptop mode
+Exec=/usr/bin/twoinone laptop
+[Desktop Action tablet-mode]
+Name=Tablet mode
+Exec=/usr/bin/twoinone tablet
