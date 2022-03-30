@@ -32,8 +32,9 @@ fn switch_devices(devices: &JsonValue, target_action: &str) -> Result<(), Box<dy
             device_path.parent().and_then(|p| { p.to_str() }).unwrap()
         );
         println!(
-            "{target_action}ing {:?} to {}",
+            "{target_action}ing {:?} {} {}",
             device_path.file_name().unwrap(),
+            if target_action == "bind" {"to"} else {"from"},
             target
         );
         writeln!(
@@ -119,8 +120,8 @@ fn app() -> Result<(), Box<dyn Error>> {
     match devices {
         Some(devices) => {
             let target_mode = match env::var("TARGET_MODE") {
-                Ok(val) => val == "laptop",
-                Err(_)  => !determine_current_mode(&devices)?,
+                Ok(val) if val != "" => val == "laptop",
+                _  => !determine_current_mode(&devices)?,
             };
             if !target_mode {
                 for command in tablet_commands.members() {
