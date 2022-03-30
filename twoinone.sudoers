@@ -1,0 +1,9 @@
+# This file is part of twoinone
+#
+# It is used to enable users of the 'tablet' group to use twoinone without sudo
+#
+################################################################################
+
+Cmnd_Alias SANITIZED = /usr/share/twoinone/env_sanitizer *
+
+%tablet ALL=(ALL) NOPASSWD: SANITIZED

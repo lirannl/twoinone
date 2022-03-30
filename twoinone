@@ -1,0 +1,2 @@
+sudo /usr/share/twoinone/env_sanitizer
+ORIG_USER=$USER DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS $@
