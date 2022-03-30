@@ -28,7 +28,7 @@ chmod 644 "/usr/share/applications/twoinone.desktop"
 ```
 Note: twoinone depends on libc, sudo, and bash to function.
 
-Alternatively, an AUR package is in the works.
+Alternatively, an AUR package is available under 'twoinone'.
 
 # Configuration
 The application looks for its configuration on /etc/twoinone.json, parsing a valid json (regardless of spacing).
