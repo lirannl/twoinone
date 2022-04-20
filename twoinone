@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 if [ "$1" == "-h" ] || [ "$1" == "--help" ] || [ "$1" == "-help" ]
 then echo "Switch two-in-one between laptop and tablet modes.
 Usage:
@@ -7,5 +8,6 @@ To use twoinone without root permissions, add yourself to the 'tablet' group usi
 else sudo /usr/share/twoinone/env_sanitizer \
 ORIG_USER=$USER \
 DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS \
+XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
 TARGET_MODE=$1
 fi
