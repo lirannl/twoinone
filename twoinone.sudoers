@@ -6,4 +6,4 @@
 
 Cmnd_Alias TWOINONE = /usr/share/twoinone/twoinone
 
-%tablet ALL=(ALL) NOPASSWD: TWOINONE
+%tablet ALL=(ALL) NOPASSWD:SETENV: TWOINONE
