@@ -1,4 +1,0 @@
-for arg in $@
-do export $arg
-done
-/usr/share/twoinone/twoinone

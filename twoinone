@@ -4,10 +4,14 @@ then echo "Switch two-in-one between laptop and tablet modes.
 Usage:
 twoinone : toggle mode
 twoinone [laptop|tablet] : select a specific mode
-To use twoinone without root permissions, add yourself to the 'tablet' group using 'sudo usermod -aG tablet $\USER'"
-else sudo /usr/share/twoinone/env_sanitizer \
-ORIG_USER=$USER \
-DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS \
-XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
-TARGET_MODE=$1
+To use twoinone without a sudo prompt, add yourself to the 'tablet' group using 'sudo usermod -aG tablet $\USER'"
+else
+export ORIG_USER=$USER
+export DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS
+export XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR
+export TARGET_MODE=$1
+for arg in $@
+do export $arg
+done
+sudo /usr/share/twoinone/twoinone
 fi

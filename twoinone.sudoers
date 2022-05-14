@@ -4,6 +4,6 @@
 #
 ################################################################################
 
-Cmnd_Alias SANITIZED = /usr/share/twoinone/env_sanitizer *
+Cmnd_Alias TWOINONE = /usr/share/twoinone/twoinone
 
-%tablet ALL=(ALL) NOPASSWD: SANITIZED
+%tablet ALL=(ALL) NOPASSWD: TWOINONE

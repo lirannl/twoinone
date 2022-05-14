@@ -1,5 +1,5 @@
+use fancy_regex::Regex;
 use json::{self, JsonValue};
-use regex::Regex;
 use simple_error::{bail, simple_error};
 use std::{
     env,
@@ -15,18 +15,41 @@ extern "C" {
     fn geteuid() -> u32;
 }
 
-fn switch_devices(devices: &JsonValue, target_action: &str) -> Result<(), Box<dyn Error>> {
-    let is_root = unsafe { geteuid() == 0 };
-    for device in devices.members() {
-        let dev = device
-            .as_str()
-            .ok_or(simple_error!("Couldn't parse device."))?
-            .into();
-        // Throw an error (and exit) if any device is not of the right shape
-        if !Regex::new("^/sys/bus/[\\w-]+/drivers/[\\w-]+/[^W\"]+")?.is_match(dev) {
-            bail!(format!("Invalid device {dev}! Must be of shape /sys/bus/{{bus}}/drivers/{{driver}}/{{device}}"));
+/**
+ * Given a path with "*" wildcards, replace the wildcard with the first existing file that matches the pattern.
+ */
+fn expand_wildcards(orig: &str) -> Result<String, Box<dyn Error>> {
+    let mut expanded = orig.to_string();
+    let part_re = Regex::new(r"(?<=/)[-\w:*.]+").unwrap();
+    for part in part_re.find_iter(orig) {
+        let part_m = part?;
+        let part = &orig[part_m.start()..part_m.end()];
+        if !part.contains('*') {
+            continue;
         }
-        let device_path = Path::new(dev);
+        let mut file_names = fs::read_dir(&expanded[0..part_m.start()])?
+            .filter_map(|f| f.ok())
+            .map(|e| e.file_name().into_string())
+            .filter_map(|s| s.ok())
+            // .collect::<Vec<_>>()
+            ;
+        let part_re = Regex::new(&format!("^{}$", part.replace("*", ".*"))).unwrap();
+        let file_name = file_names
+            .find(|n| part_re.is_match(n).unwrap())
+            .ok_or(simple_error!("No match for {}", part))?;
+        expanded = expanded.replace(part, &file_name);
+    }
+    Ok(expanded)
+}
+
+fn switch_devices(devices: Vec<String>, target_action: &str) -> Result<(), Box<dyn Error>> {
+    let is_root = unsafe { geteuid() == 0 };
+    for device in devices {
+        let device = device.as_str();
+        if !Regex::new("^/sys/bus/[-\\w\"]+/drivers/[-\\w\"]+/[-\\w\"]+")?.is_match(device)? {
+            bail!(format!("Invalid device {device}! Must be of shape /sys/bus/{{bus}}/drivers/{{driver}}/{{device}}"));
+        }
+        let device_path = Path::new(device);
         let target = format!(
             "{}/{target_action}",
             device_path.parent().and_then(|p| { p.to_str() }).unwrap()
@@ -34,8 +57,15 @@ fn switch_devices(devices: &JsonValue, target_action: &str) -> Result<(), Box<dy
         println!(
             "{target_action}ing {:?} {} {}",
             device_path.file_name().unwrap(),
-            if target_action == "bind" {"to"} else {"from"},
-            target
+            if target_action == "bind" {
+                "to"
+            } else {
+                "from"
+            },
+            Regex::new(r".*(?=/[-\w:*.]+$)")?
+                .find(&target)?
+                .ok_or(simple_error!("Invalid target"))?
+                .as_str()
         );
         writeln!(
             fs::OpenOptions::new()
@@ -65,10 +95,7 @@ fn smart_execute(command: &JsonValue) -> Result<(), Box<dyn Error>> {
         .as_str()
         .ok_or(simple_error!("Command must be a string"))?;
     if unsafe { geteuid() != 0 } || command.starts_with("sudo ") {
-        Command::new("bash")
-            .arg("-c")
-            .arg(command)
-            .spawn()?;
+        Command::new("bash").arg("-c").arg(command).spawn()?;
     } else {
         Command::new("sudo")
             .arg("-u")
@@ -85,14 +112,9 @@ fn smart_execute(command: &JsonValue) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn determine_current_mode(devices: &JsonValue) -> Result<bool, Box<dyn Error>> {
-    let firstdev = devices[0]
-        .as_str()
-        .ok_or(simple_error!("Device is not a string"))?;
-    if !Regex::new("^/sys/bus/[\\w-]+/drivers/[\\w-]+/[^W\"]+")?.is_match(firstdev) {
-        bail!(format!("Invalid device {firstdev}! Must be of shape /sys/bus/{{bus}}/drivers/{{driver}}/{{device}}"));
-    }
-    Ok(Path::new(firstdev).exists())
+fn determine_current_mode(devices: &Vec<String>) -> Result<bool, Box<dyn Error>> {
+    let firstdev = &devices[0];
+    Ok(Path::new(firstdev.as_str()).exists())
 }
 
 fn app() -> Result<(), Box<dyn Error>> {
@@ -103,7 +125,10 @@ fn app() -> Result<(), Box<dyn Error>> {
             let devices = config["devices"].clone();
             let laptop_commands = config["laptop_commands"].clone();
             let tablet_commands = config["tablet_commands"].clone();
-            (Some(devices), laptop_commands, tablet_commands)
+            if !devices.is_array() {
+                bail!("No \"devices\" array specified in config file");
+            }
+            (devices, laptop_commands, tablet_commands)
         }
         Err(msg) => {
             eprintln!(
@@ -111,34 +136,38 @@ fn app() -> Result<(), Box<dyn Error>> {
                 msg.to_string()
             );
             (
-                None,
+                JsonValue::from(JsonValue::Null),
                 JsonValue::from(JsonValue::Null),
                 JsonValue::from(JsonValue::Null),
             )
         }
     };
-    match devices {
-        Some(devices) => {
-            let target_mode = match env::var("TARGET_MODE") {
-                Ok(val) if val == "laptop" => Ok(true),
-                Ok(val) if val == "tablet" => Ok(false),
-                Ok(val) if val != "" => Err(simple_error!("Invalid mode argument")),
-                _  => Ok(!determine_current_mode(&devices)?),
-            }?;
-            if !target_mode {
-                for command in tablet_commands.members() {
-                    smart_execute(command)?;
-                }
-            }
-            switch_devices(&devices, if target_mode { "bind" } else { "unbind" })?;
-            if target_mode {
-                for command in laptop_commands.members() {
-                    smart_execute(command)?;
-                }
-            }
+    let devices = devices
+        .members()
+        .map(|d| match d.as_str() {
+            Some(d) => expand_wildcards(d),
+            None => bail!("Device must be a string"),
+        })
+        .filter_map(|d| d.ok())
+        .collect::<Vec<_>>();
+
+    let target_mode = match env::var("TARGET_MODE") {
+        Ok(val) if val == "laptop" => Ok(true),
+        Ok(val) if val == "tablet" => Ok(false),
+        Ok(val) if val != "" => Err(simple_error!("Invalid mode argument")),
+        _ => Ok(!determine_current_mode(&devices)?),
+    }?;
+    if !target_mode {
+        for command in tablet_commands.members() {
+            smart_execute(command)?;
         }
-        None => {
-            eprintln!("No devices specified!");
+    }
+
+    switch_devices(devices, if target_mode { "bind" } else { "unbind" })?;
+
+    if target_mode {
+        for command in laptop_commands.members() {
+            smart_execute(command)?;
         }
     }
     Ok(())
