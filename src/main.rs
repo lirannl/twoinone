@@ -20,6 +20,7 @@ extern "C" {
  */
 fn expand_wildcards(orig: &str) -> Result<String, Box<dyn Error>> {
     let mut expanded = orig.to_string();
+    // Query for parts with wildcards
     let part_re = Regex::new(r"(?<=/)[-\w:*.]+").unwrap();
     for part in part_re.find_iter(orig) {
         let part_m = part?;
@@ -27,12 +28,17 @@ fn expand_wildcards(orig: &str) -> Result<String, Box<dyn Error>> {
         if !part.contains('*') {
             continue;
         }
-        let mut file_names = fs::read_dir(&expanded[0..part_m.start()])?
+        // Query for devices on provided bus
+        let bus_devices_path = Regex::new(r"^/sys/bus/[-\w:*.]+")?
+            .find(&expanded)?
+            .unwrap()
+            .as_str()
+            .to_owned()
+            + "/devices";
+        let mut file_names = fs::read_dir(bus_devices_path)?
             .filter_map(|f| f.ok())
             .map(|e| e.file_name().into_string())
-            .filter_map(|s| s.ok())
-            // .collect::<Vec<_>>()
-            ;
+            .filter_map(|s| s.ok());
         let part_re = Regex::new(&format!("^{}$", part.replace("*", ".*"))).unwrap();
         let file_name = file_names
             .find(|n| part_re.is_match(n).unwrap())
